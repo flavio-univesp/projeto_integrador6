@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Acesso ao ambiente de gestão do condomínio">
+  <title>Controle de Acessos - Login</title>
+  <link rel="stylesheet" href="/home/style.css">
+  <link rel="stylesheet" href="/login/style.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Controle de Acessos</h1>
+    <h2>Acesso Inteligente para Condomínios</h2>
+  </header>
+
+  <main id="conteudo" class="container login-container" role="main">
+    <section class="box login-box" aria-labelledby="login-title">
+      <h3 id="login-title">Área de Acesso Gestão</h3>
+      <p>Entre com os dados cadastrados para acessar o ambiente.</p>
+
+      <% if (error) { %>
+        <div class="message error" role="alert"><%= error %></div>
+      <% } %>
+
+      <form action="/login" method="POST">
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            value="<%= email %>"
+            autocomplete="username"
+            inputmode="email"
+            placeholder="nome@exemplo.com"
+            required
+            autofocus
+          >
+        </div>
+
+        <div class="field">
+          <label for="senha">Senha</label>
+          <input
+            id="senha"
+            type="password"
+            name="senha"
+            autocomplete="current-password"
+            placeholder="Digite sua senha"
+            required
+          >
+        </div>
+
+        <button type="submit" class="button">Entrar</button>
+      </form>
+
+      <nav class="login-links" aria-label="Opções de acesso">
+        <a href="/home">Voltar para o início</a>
+        <a href="/cadastro-portaria">Cadastro Portaria</a>
+      </nav>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    &copy; 2026 Controle de Acessos - Acesso Inteligente
+  </footer>
+
+  <div class="acessibility-box" id="acessibilityBox">
+    <div class="acessibility-menu">
+      <button id="zoomInBtn" aria-label="Aumentar zoom da página">+</button>
+      <button id="zoomOutBtn" aria-label="Diminuir zoom da página">-</button>
+      <button class="acessibility-toggle-btn" aria-expanded="false" aria-controls="acessibility-content" aria-label="Abrir ou fechar acessibilidade">
+        <span aria-hidden="true">💡</span>
+      </button>
+    </div>
+    <div class="acessibility-content" id="acessibility-content">
+      <p>Use esta página para acessar o ambiente de gestão do condomínio com seu e-mail e senha.</p>
+    </div>
+  </div>
+
+  <script src="/home/script.js"></script>
+</body>
+</html>

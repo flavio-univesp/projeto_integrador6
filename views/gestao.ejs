@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Opções de gestão do controle de acessos">
+  <title>Gestão | Controle de Acessos</title>
+  <link rel="stylesheet" href="/home/style.css">
+  <link rel="stylesheet" href="/gestao/style.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Gestão</h1>
+    <h2>Controle de Acessos</h2>
+  </header>
+
+  <main id="conteudo" class="container gestao-container" role="main">
+    <section class="box gestao-option" aria-labelledby="edicao-portaria-title">
+      <h3 id="edicao-portaria-title">Edição do usuário de portaria</h3>
+      <p>Atualize seus dados de acesso e turno.</p>
+      <form action="/gestao/acessar-edicao-portaria" method="POST" class="access-form">
+        <input type="hidden" name="token" value="<%= editPortariaToken %>">
+        <button type="submit" class="button">Acesso</button>
+      </form>
+    </section>
+
+    <section class="box gestao-option" aria-labelledby="cadastro-tag-title">
+      <h3 id="cadastro-tag-title">Cadastro TAG Morador</h3>
+      <p>Associe uma TAG ao cadastro de um morador.</p>
+      <a href="/gestao/cadastro-tag-morador" class="button">Acesso</a>
+    </section>
+
+    <section class="box gestao-option" aria-labelledby="lista-acesso-title">
+      <h3 id="lista-acesso-title">Visualização e controle de acessos a portaria</h3>
+      <p>Lista os acessos a portaria central.</p>
+      <a href="/lista-acesso-gestao" class="button">Acesso</a>
+    </section>
+  </main>
+
+  <nav class="session-actions" aria-label="Sessão">
+    <span>Olá, <%= user.nome %></span>
+    <a href="/logout">Sair</a>
+  </nav>
+
+  <footer class="footer" role="contentinfo">
+    &copy; 2026 Controle de Acessos - Acesso Inteligente
+  </footer>
+
+  <div class="acessibility-box" id="acessibilityBox">
+    <div class="acessibility-menu">
+      <button id="zoomInBtn" aria-label="Aumentar zoom da página">+</button>
+      <button id="zoomOutBtn" aria-label="Diminuir zoom da página">-</button>
+      <button class="acessibility-toggle-btn" aria-expanded="false" aria-controls="acessibility-content" aria-label="Abrir ou fechar acessibilidade">
+        <span aria-hidden="true">💡</span>
+      </button>
+    </div>
+    <div class="acessibility-content" id="acessibility-content">
+      <p>Selecione uma das opções disponíveis para gerenciar o controle de acessos.</p>
+    </div>
+  </div>
+
+  <script src="/home/script.js"></script>
+</body>
+</html>

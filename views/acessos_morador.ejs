@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Histórico de acessos do morador">
+  <title>Visualização e controle de acessos</title>
+  <link rel="stylesheet" href="/home/style.css">
+  <link rel="stylesheet" href="/gestao/lista-acesso.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Controle de Acessos</h1>
+    <h2>Visualização e controle de acessos</h2>
+  </header>
+
+  <main id="conteudo" class="access-list-container" role="main">
+    <section class="access-list-panel" aria-labelledby="lista-title">
+      <h3 id="lista-title">Seus acessos à portaria central</h3>
+
+      <dl class="resident-summary">
+        <div><dt>Morador</dt><dd><%= morador.nome_completo %></dd></div>
+        <div><dt>E-mail</dt><dd><%= morador.email %></dd></div>
+        <div><dt>TAGID</dt><dd><%= morador.TAGID || 'Sem TAG cadastrada' %></dd></div>
+      </dl>
+
+      <form action="/acessos-morador" method="GET" class="access-filters">
+        <label for="data">Data do acesso</label>
+        <div class="filter-control">
+          <input id="data" type="date" name="data" value="<%= filtros.data %>">
+          <button type="submit">Filtrar por data</button>
+        </div>
+
+        <label for="situacao">Situação</label>
+        <div class="filter-control">
+          <select id="situacao" name="situacao">
+            <option value="">Todas</option>
+            <option value="liberado" <%= filtros.situacao === 'liberado' ? 'selected' : '' %>>Liberado</option>
+            <option value="bloqueado" <%= filtros.situacao === 'bloqueado' ? 'selected' : '' %>>Bloqueado</option>
+          </select>
+          <button type="submit">Filtrar por situação</button>
+        </div>
+
+        <% if (filtros.data || filtros.situacao) { %>
+          <a href="/acessos-morador" class="clear-filters">Limpar filtros</a>
+        <% } %>
+      </form>
+
+      <% if (error) { %>
+        <div class="message error" role="alert"><%= error %></div>
+      <% } %>
+
+      <p class="result-count"><strong><%= acessos.length %></strong> registro(s) encontrado(s).</p>
+
+      <% if (acessos.length > 0) { %>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Seus registros de acesso à portaria">
+          <table class="resident-access-table">
+            <thead>
+              <tr>
+                <th scope="col">Data e hora</th>
+                <th scope="col">TAGID</th>
+                <th scope="col">Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% acessos.forEach((acesso) => { %>
+                <tr>
+                  <td><%= acesso.acesso %></td>
+                  <td><%= acesso.tagid %></td>
+                  <td>
+                    <span class="access-status <%= acesso.liberacao ? 'allowed' : 'blocked' %>">
+                      <%= acesso.liberacao ? 'Liberado' : 'Bloqueado' %>
+                    </span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else if (!error) { %>
+        <p class="empty-state">Nenhum acesso encontrado para os filtros informados.</p>
+      <% } %>
+    </section>
+  </main>
+
+  <nav class="page-return" aria-label="Retornar">
+    <a href="/menu-morador">Voltar para Menu Morador</a>
+  </nav>
+
+  <footer class="footer" role="contentinfo">&copy; 2026 Controle de Acessos - Acesso Inteligente</footer>
+</body>
+</html>

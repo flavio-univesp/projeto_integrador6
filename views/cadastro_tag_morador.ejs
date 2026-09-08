@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro TAG Morador</title>
+  <link rel="stylesheet" href="/home/style.css">
+  <link rel="stylesheet" href="/gestao/form.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Controle de Acessos</h1>
+    <h2>Cadastro TAG Morador</h2>
+  </header>
+
+  <main id="conteudo" class="container form-container" role="main">
+    <section class="box form-box" aria-labelledby="form-title">
+      <h3 id="form-title">Vincular TAG</h3>
+      <p>Localize o morador pelo e-mail antes de cadastrar a TAG.</p>
+
+      <% if (error) { %><div class="message error" role="alert"><%= error %></div><% } %>
+      <% if (success) { %><div class="message success" role="status"><%= success %></div><% } %>
+
+      <form action="/gestao/cadastro-tag-morador" method="POST">
+        <label for="email">E-mail do morador</label>
+        <input id="email" type="email" name="email" value="<%= email %>" autocomplete="email" <%= morador ? 'readonly' : '' %> required>
+
+        <% if (!morador) { %>
+          <button type="submit" name="action" value="localizar" class="button">Localizar morador</button>
+        <% } %>
+
+        <% if (morador && !confirmation) { %>
+          <label for="nome">Nome do morador</label>
+          <input id="nome" value="<%= morador.nome_completo %>" readonly aria-readonly="true">
+
+          <% if (morador.TAGID) { %>
+            <label for="tag-atual">TAG atual</label>
+            <input id="tag-atual" value="<%= morador.TAGID %>" readonly aria-readonly="true">
+          <% } %>
+
+          <label for="tag"><%= morador.TAGID ? 'Nova TAG' : 'TAG' %></label>
+          <input id="tag" name="tag" value="<%= tag %>" maxlength="20" required>
+
+          <button type="submit" name="action" value="salvar" class="button"><%= morador.TAGID ? 'Alterar TAG' : 'Cadastrar TAG' %></button>
+          <a href="/gestao/cadastro-tag-morador" class="secondary-link">Localizar outro morador</a>
+        <% } %>
+      </form>
+
+      <% if (morador && confirmation) { %>
+        <div class="confirmation" role="alertdialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description">
+          <h4 id="confirmation-title">Confirmar alteração</h4>
+          <p id="confirmation-description">Já existe a TAG <strong><%= morador.TAGID %></strong> para <strong><%= morador.nome_completo %></strong>. Deseja alterá-la para <strong><%= tag %></strong>?</p>
+          <form action="/gestao/cadastro-tag-morador" method="POST" class="confirmation-actions">
+            <input type="hidden" name="email" value="<%= email %>">
+            <input type="hidden" name="tag" value="<%= tag %>">
+            <button type="submit" name="action" value="confirmar" class="button">Sim, alterar</button>
+            <button type="submit" name="action" value="cancelar" class="button secondary-button">Não, voltar</button>
+          </form>
+        </div>
+      <% } %>
+
+      <a href="/gestao" class="back-link">Voltar para Gestão</a>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">&copy; 2026 Controle de Acessos - Acesso Inteligente</footer>
+
+  <div class="acessibility-box" id="acessibilityBox">
+    <div class="acessibility-menu">
+      <button id="zoomInBtn" aria-label="Aumentar zoom da página">+</button>
+      <button id="zoomOutBtn" aria-label="Diminuir zoom da página">-</button>
+      <button class="acessibility-toggle-btn" aria-expanded="false" aria-controls="acessibility-content" aria-label="Abrir ou fechar acessibilidade"><span aria-hidden="true">💡</span></button>
+    </div>
+    <div class="acessibility-content" id="acessibility-content"><p>Associe uma TAG ao cadastro de um morador.</p></div>
+  </div>
+
+  <script src="/home/script.js"></script>
+</body>
+</html>

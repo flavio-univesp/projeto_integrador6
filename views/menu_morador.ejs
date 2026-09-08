@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Menu de serviços do morador">
+  <title>Menu Morador | Controle de Acessos</title>
+  <link rel="stylesheet" href="/home/style.css">
+  <link rel="stylesheet" href="/gestao/style.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Menu Morador</h1>
+    <h2>Controle de Acessos</h2>
+  </header>
+
+  <main id="conteudo" class="container gestao-container" role="main">
+    <section class="box gestao-option" aria-labelledby="edicao-morador-title">
+      <h3 id="edicao-morador-title">Edição do Morador</h3>
+      <p>Consulte e atualize seus dados cadastrais.</p>
+      <a href="/edicao-morador" class="button">Acesso</a>
+    </section>
+
+    <section class="box gestao-option" aria-labelledby="acessos-morador-title">
+      <h3 id="acessos-morador-title">Visualização e controle de acessos</h3>
+      <p>Consulte sua identificação de acesso.</p>
+      <a href="/acessos-morador" class="button">Acesso</a>
+    </section>
+  </main>
+
+  <nav class="session-actions" aria-label="Sessão">
+    <span>Olá, <%= user.nome %></span>
+    <a href="/logout">Sair</a>
+  </nav>
+
+  <footer class="footer" role="contentinfo">&copy; 2026 Controle de Acessos - Acesso Inteligente</footer>
+
+  <div class="acessibility-box" id="acessibilityBox">
+    <div class="acessibility-menu">
+      <button id="zoomInBtn" aria-label="Aumentar zoom da página">+</button>
+      <button id="zoomOutBtn" aria-label="Diminuir zoom da página">-</button>
+      <button class="acessibility-toggle-btn" aria-expanded="false" aria-controls="acessibility-content" aria-label="Abrir ou fechar acessibilidade"><span aria-hidden="true">💡</span></button>
+    </div>
+    <div class="acessibility-content" id="acessibility-content"><p>Selecione uma opção para consultar ou atualizar seus dados.</p></div>
+  </div>
+
+  <script src="/home/script.js"></script>
+</body>
+</html>

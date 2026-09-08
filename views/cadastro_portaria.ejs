@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro de Portaria</title>
+  <link rel="stylesheet" href="/cadastro_portaria/style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a href="/home" class="back-link">← Voltar</a>
+      <h1>Cadastro de Portaria</h1>
+    </header>
+
+    <main class="form-card">
+      <% if (error) { %>
+        <div class="message error"><%= error %></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="message success"><%= success %></div>
+      <% } %>
+
+      <form action="/cadastro-portaria" method="POST">
+        <div class="field-grid">
+          <label>
+            Porteiro
+            <input type="text" name="nome" required>
+          </label>
+
+          <label>
+            E-mail
+            <input type="email" name="email" autocomplete="email" maxlength="150" pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$" title="Informe um e-mail válido, como usuario@dominio.com" aria-describedby="email-status" required>
+            <span id="email-status" class="field-status" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Senha
+            <input type="password" name="senha" aria-describedby="senha-status" required>
+            <span id="senha-status" class="field-status" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Turno
+            <select name="turno" aria-describedby="turno-status" required>
+              <option value="">Selecione</option>
+              <option value="Turno Diurno">Turno Diurno</option>
+              <option value="Turno Noturno">Turno Noturno</option>
+              <option value="Turno 1">Turno 1</option>
+              <option value="Turno 2">Turno 2</option>
+              <option value="Turno 3">Turno 3</option>
+            </select>
+            <span id="turno-status" class="field-status" aria-live="polite"></span>
+          </label>
+        </div>
+
+        <button type="submit" class="submit-button">Cadastrar</button>
+      </form>
+    </main>
+  </div>
+  <script src="/cadastro_portaria/script.js" defer></script>
+</body>
+</html>

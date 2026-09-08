@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Acessos</title>
+  <link rel="stylesheet" href="/home/style.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Controle de Acessos</h1>
+    <h2>Acesso Inteligente para Condomínios</h2>
+  </header>
+
+  <main id="conteudo" class="container" role="main">
+    <section class="box" aria-labelledby="cadastro-title">
+      <h3 id="cadastro-title">Área de acesso Morador</h3>
+      <p>Controle de acesso de morador</p>
+      <a href="/login-morador" class="button">Acesso</a>
+    </section>
+
+    <section class="box" aria-labelledby="acesso-title">
+      <h3 id="acesso-title">Área de Acesso Gestão</h3>
+      <p>Controle de cadastro de TAG - Gestão Condomínio</p>
+      <a href="/login" class="button">Acesso</a>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    &copy; 2026 Controle de Acessos - Acesso Inteligente
+  </footer>
+
+  <div class="acessibility-box" id="acessibilityBox">
+    <div class="acessibility-menu">
+      <button id="zoomInBtn" aria-label="Aumentar zoom da página">+</button>
+      <button id="zoomOutBtn" aria-label="Diminuir zoom da página">-</button>
+      <button class="acessibility-toggle-btn" aria-expanded="false" aria-controls="acessibility-content" aria-label="Abrir ou fechar acessibilidade">
+        <span aria-hidden="true">💡</span>
+      </button>
+    </div>
+    <div class="acessibility-content" id="acessibility-content">
+      <p>Esta é a página inicial do Controle de Acessos, desenvolvida para facilitar o cadastro de moradores e o acesso ao sistema.</p>
+    </div>
+  </div>
+
+  <script src="/home/script.js"></script>
+</body>
+</html>

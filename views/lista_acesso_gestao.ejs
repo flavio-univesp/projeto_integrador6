@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lista de acessos à portaria central">
+  <title>Lista de Acessos | Gestão</title>
+  <link rel="stylesheet" href="/home/style.css">
+  <link rel="stylesheet" href="/gestao/style.css">
+  <link rel="stylesheet" href="/gestao/form.css">
+  <link rel="stylesheet" href="/gestao/lista-acesso.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Gestão</h1>
+    <h2>Visualização e controle de acessos a portaria</h2>
+  </header>
+
+  <main id="conteudo" class="access-list-container" role="main">
+    <section class="access-list-panel" aria-labelledby="lista-title">
+      <h3 id="lista-title">Acessos à portaria central</h3>
+
+      <form action="/lista-acesso-gestao" method="GET" class="access-filters">
+        <label for="data">Data do acesso</label>
+        <div class="filter-control">
+          <input id="data" type="date" name="data" value="<%= filtros.data %>">
+          <button type="submit" name="filtrar" value="data">Filtrar por data</button>
+        </div>
+
+        <label for="email">E-mail do morador</label>
+        <div class="filter-control">
+          <input id="email" type="search" name="email" value="<%= filtros.email %>" placeholder="morador@exemplo.com" autocomplete="email">
+          <button type="submit" name="filtrar" value="email">Filtrar por e-mail</button>
+        </div>
+
+        <label for="situacao">Situação</label>
+        <div class="filter-control">
+          <select id="situacao" name="situacao">
+            <option value="">Todas</option>
+            <option value="liberado" <%= filtros.situacao === 'liberado' ? 'selected' : '' %>>Liberado</option>
+            <option value="bloqueado" <%= filtros.situacao === 'bloqueado' ? 'selected' : '' %>>Bloqueado</option>
+          </select>
+          <button type="submit" name="filtrar" value="situacao">Filtrar por situação</button>
+        </div>
+
+        <% if (filtros.data || filtros.email || filtros.situacao) { %>
+          <a href="/lista-acesso-gestao" class="clear-filters">Limpar filtros</a>
+        <% } %>
+      </form>
+
+      <% if (error) { %>
+        <div class="message error" role="alert"><%= error %></div>
+      <% } %>
+
+      <p class="result-count"><strong><%= acessos.length %></strong> registro(s) encontrado(s).</p>
+
+      <% if (acessos.length > 0) { %>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Registros de acesso à portaria">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Data e hora</th>
+                <th scope="col">Morador</th>
+                <th scope="col">E-mail</th>
+                <th scope="col">TAGID</th>
+                <th scope="col">Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% acessos.forEach((acesso) => { %>
+                <tr>
+                  <td><%= acesso.acesso %></td>
+                  <td><%= acesso.nome_completo %></td>
+                  <td><%= acesso.email %></td>
+                  <td><%= acesso.tagid %></td>
+                  <td>
+                    <span class="access-status <%= acesso.liberacao ? 'allowed' : 'blocked' %>">
+                      <%= acesso.liberacao ? 'Liberado' : 'Bloqueado' %>
+                    </span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else if (!error) { %>
+        <p class="empty-state">Nenhum acesso encontrado para os filtros informados.</p>
+      <% } %>
+
+    </section>
+  </main>
+
+  <nav class="session-actions" aria-label="Sessão">
+    <span>Olá, <%= user.nome %></span>
+    <a href="/logout">Sair</a>
+  </nav>
+
+  <nav class="page-return" aria-label="Retornar">
+    <a href="/gestao">Voltar para Gestão</a>
+  </nav>
+
+  <footer class="footer" role="contentinfo">
+    &copy; 2026 Controle de Acessos - Acesso Inteligente
+  </footer>
+</body>
+</html>

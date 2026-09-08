@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edição do Morador</title>
+  <link rel="stylesheet" href="/cadastro_morador/style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a href="/menu-morador" class="back-link">← Voltar</a>
+      <h1>Edição do Morador</h1>
+    </header>
+
+    <main class="form-card">
+      <% if (error) { %><div class="message error" role="alert"><%= error %></div><% } %>
+      <% if (success) { %><div class="message success" role="status"><%= success %></div><% } %>
+
+      <form action="/edicao-morador" method="POST">
+        <div class="field-grid">
+          <label>
+            Nome completo
+            <input type="text" value="<%= morador.nome_completo %>" readonly aria-readonly="true">
+          </label>
+
+          <label>
+            TAGID
+            <input type="text" value="<%= morador.TAGID || 'Sem TAG cadastrada' %>" readonly aria-readonly="true">
+          </label>
+
+          <label>
+            E-mail
+            <input type="email" name="email" value="<%= morador.email %>" autocomplete="email" maxlength="150" aria-describedby="email-status" required>
+            <span id="email-status" class="field-status" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Nova senha
+            <input type="password" name="senha" autocomplete="new-password" aria-describedby="senha-status" placeholder="Deixe em branco para manter a senha atual">
+            <span id="senha-status" class="field-status" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Telefone
+            <input type="tel" name="telefone" value="<%= morador.telefone || '' %>" inputmode="numeric" autocomplete="tel" maxlength="15" pattern="\(\d{2}\) \d{4,5}-\d{4}">
+          </label>
+
+          <label>
+            Sexo
+            <select name="genero">
+              <option value="">Selecione</option>
+              <option value="Masculino" <%= morador.sexo === 'Masculino' ? 'selected' : '' %>>Masculino</option>
+              <option value="Feminino" <%= morador.sexo === 'Feminino' ? 'selected' : '' %>>Feminino</option>
+              <option value="Outro" <%= morador.sexo === 'Outro' ? 'selected' : '' %>>Outro</option>
+            </select>
+          </label>
+
+          <label>
+            Data de nascimento
+            <input type="date" name="datanasc" value="<%= morador.data_nascimento || '' %>">
+          </label>
+
+          <label>
+            CEP
+            <input type="text" name="cep" value="<%= morador.cep || '' %>" inputmode="numeric" autocomplete="postal-code" maxlength="9" aria-describedby="cep-status">
+            <span id="cep-status" class="field-status" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Endereço
+            <input type="text" name="endereco" value="<%= morador.endereco || '' %>" autocomplete="street-address" readonly aria-readonly="true">
+          </label>
+
+          <label>
+            Número
+            <input type="text" name="numero" value="<%= morador.numero || '' %>">
+          </label>
+
+          <label>
+            Cidade
+            <input type="text" name="cidade" value="<%= morador.cidade || '' %>" autocomplete="address-level2" readonly aria-readonly="true">
+          </label>
+
+          <label>
+            Estado
+            <input type="text" name="estado" value="<%= morador.estado || '' %>" autocomplete="address-level1" maxlength="2" readonly aria-readonly="true">
+          </label>
+
+          <label>
+            Complemento
+            <input type="text" name="complemento" value="<%= morador.complemento || '' %>">
+          </label>
+        </div>
+
+        <button type="submit" class="submit-button">Salvar alterações</button>
+      </form>
+    </main>
+  </div>
+  <script src="/cadastro_morador/script.js" defer></script>
+</body>
+</html>

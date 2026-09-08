@@ -1,0 +1,131 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f7fb;
+  color: #1f2937;
+}
+
+.page-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+}
+
+.topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  margin-bottom: 24px;
+}
+
+.topbar h1 {
+  margin: 0;
+  color: #004085;
+  text-align: center;
+}
+
+.back-link {
+  position: absolute;
+  left: 0;
+  text-decoration: none;
+  color: #004085;
+  font-weight: 700;
+}
+
+.form-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 32px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #2b2b2b;
+  font-weight: 600;
+}
+
+input, select, textarea, button {
+  font: inherit;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #ccd7e0;
+  border-radius: 10px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+input[readonly] {
+  background: #edf1f5;
+  color: #52606d;
+  cursor: not-allowed;
+}
+
+.field-status {
+  min-height: 18px;
+  color: #52606d;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.field-status.error {
+  color: #8a1c1c;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.submit-button {
+  width: 100%;
+  margin-top: 24px;
+  background: #004085;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.message {
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.message.error {
+  background: #ffe5e5;
+  color: #8a1c1c;
+}
+.message.success {
+  background: #e5f9ee;
+  color: #17643c;
+}
+
+@media (max-width: 700px) {
+  .field-grid { grid-template-columns: 1fr; }
+  .topbar {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .back-link {
+    position: static;
+    align-self: flex-start;
+  }
+  .topbar h1 { width: 100%; }
+  .form-card { padding: 20px; }
+}

@@ -1,0 +1,153 @@
+/* Reset e configurações base */
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff;
+  color: #212529;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #ffffff;
+  padding: 8px;
+  z-index: 1000;
+  border-radius: 4px;
+}
+.skip-link:focus {
+  top: 6px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.header h1 {
+  font-size: 48px;
+  margin-bottom: 0;
+  color: #004085;
+}
+.header h2 {
+  font-size: 28px;
+  margin-top: 10px;
+  color: #004085;
+}
+.container {
+  display: flex;
+  justify-content: center;
+  gap: 36px;
+  width: 100%;
+  max-width: 1100px;
+  flex-wrap: wrap;
+}
+.box {
+  width: 100%;
+  max-width: 420px;
+  padding: 30px;
+  border: 2px solid #004085;
+  background-color: #e6f3ff;
+  text-align: center;
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.box h3 {
+  font-size: 24px;
+  margin-bottom: 16px;
+  color: #004085;
+}
+.box p {
+  font-size: 16px;
+  margin-bottom: 20px;
+  color: #2b2b2b;
+}
+.button {
+  display: block;
+  width: 80%;
+  margin: 0 auto;
+  padding: 15px;
+  background-color: #004085;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #ffffff;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+.button:hover, .button:focus {
+  background-color: #002752;
+  transform: translateY(-2px);
+  outline: 3px solid #ffd700;
+  outline-offset: 2px;
+}
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+  outline: none;
+}
+.footer {
+  margin-top: 40px;
+  font-size: 16px;
+  color: #6c757d;
+}
+
+.acessibility-box {
+  position: fixed;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  z-index: 999;
+}
+.acessibility-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.acessibility-menu button {
+  background-color: #004085;
+  color: white;
+  border: none;
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-top: 10px;
+  cursor: pointer;
+}
+.acessibility-content {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 15px;
+  width: 250px;
+  position: absolute;
+  top: 0;
+  right: 60px;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.95);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.acessibility-box.active .acessibility-content {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+}
+
+@media (max-width: 768px) {
+  .header h1 { font-size: 36px; }
+  .header h2 { font-size: 22px; }
+  .container { flex-direction: column; align-items: center; }
+  .box {
+    box-sizing: border-box;
+    width: calc(100% - 32px);
+  }
+}

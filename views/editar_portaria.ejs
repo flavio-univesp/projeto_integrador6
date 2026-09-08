@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edição do usuário de portaria</title>
+  <link rel="stylesheet" href="/home/style.css">
+  <link rel="stylesheet" href="/gestao/form.css">
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo principal</a>
+
+  <header class="header" role="banner">
+    <h1>Controle de Acessos</h1>
+    <h2>Edição do usuário de portaria</h2>
+  </header>
+
+  <main id="conteudo" class="container form-container" role="main">
+    <section class="box form-box" aria-labelledby="form-title">
+      <h3 id="form-title">Dados da portaria</h3>
+
+      <% if (error) { %><div class="message error" role="alert"><%= error %></div><% } %>
+      <% if (success) { %><div class="message success" role="status"><%= success %></div><% } %>
+
+      <form action="/gestao/editar-portaria" method="POST">
+        <label for="nome">Porteiro</label>
+        <input id="nome" name="nome" value="<%= portaria.nome_completo %>" required>
+
+        <label for="email">E-mail</label>
+        <input id="email" type="email" name="email" value="<%= portaria.email %>" autocomplete="email" required>
+
+        <label for="turno">Turno</label>
+        <select id="turno" name="turno" required>
+          <% turnos.forEach((turno) => { %>
+            <option value="<%= turno.id %>" <%= Number(portaria.turno) === turno.id ? 'selected' : '' %>><%= turno.nome %></option>
+          <% }) %>
+        </select>
+
+        <label for="senha">Nova senha</label>
+        <input id="senha" type="password" name="senha" autocomplete="new-password" placeholder="Deixe em branco para manter a senha atual">
+
+        <button type="submit" class="button">Salvar alterações</button>
+      </form>
+
+      <a href="/gestao" class="back-link">Voltar para Gestão</a>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">&copy; 2026 Controle de Acessos - Acesso Inteligente</footer>
+
+  <div class="acessibility-box" id="acessibilityBox">
+    <div class="acessibility-menu">
+      <button id="zoomInBtn" aria-label="Aumentar zoom da página">+</button>
+      <button id="zoomOutBtn" aria-label="Diminuir zoom da página">-</button>
+      <button class="acessibility-toggle-btn" aria-expanded="false" aria-controls="acessibility-content" aria-label="Abrir ou fechar acessibilidade"><span aria-hidden="true">💡</span></button>
+    </div>
+    <div class="acessibility-content" id="acessibility-content"><p>Atualize os dados do usuário de portaria.</p></div>
+  </div>
+
+  <script src="/home/script.js"></script>
+</body>
+</html>
