@@ -105,21 +105,29 @@ async function initDatabase() {
         acesso DATETIME NOT NULL,
         liberacao BOOLEAN NOT NULL,
         CONSTRAINT fk_controle_acesso_morador_tagid
-          FOREIGN KEY (tagid) REFERENCES moradores (TAGID)
+          FOREIGN KEY (tagid) REFERENCES moradores (TAGID) ON UPDATE CASCADE
       )
     `);
     const [controleAcessoConstraint] = await connection.execute(
-      `SELECT CONSTRAINT_NAME
-       FROM information_schema.KEY_COLUMN_USAGE
-       WHERE TABLE_SCHEMA = DATABASE()
-         AND TABLE_NAME = 'controle-acesso'
-         AND COLUMN_NAME = 'tagid'
-         AND REFERENCED_TABLE_NAME = 'moradores'
-         AND REFERENCED_COLUMN_NAME = 'TAGID'`
+      `SELECT kcu.CONSTRAINT_NAME, rc.UPDATE_RULE
+       FROM information_schema.KEY_COLUMN_USAGE kcu
+       INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+         ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+        AND rc.TABLE_NAME = kcu.TABLE_NAME
+        AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+       WHERE kcu.TABLE_SCHEMA = DATABASE()
+         AND kcu.TABLE_NAME = 'controle-acesso'
+         AND kcu.COLUMN_NAME = 'tagid'
+         AND kcu.REFERENCED_TABLE_NAME = 'moradores'
+         AND kcu.REFERENCED_COLUMN_NAME = 'TAGID'`
     );
-    if (controleAcessoConstraint.length === 0) {
+    if (controleAcessoConstraint.length > 0 && controleAcessoConstraint[0].UPDATE_RULE !== 'CASCADE') {
+      const constraintName = controleAcessoConstraint[0].CONSTRAINT_NAME.replace(/`/g, '``');
+      await connection.query(`ALTER TABLE \`controle-acesso\` DROP FOREIGN KEY \`${constraintName}\``);
+    }
+    if (controleAcessoConstraint.length === 0 || controleAcessoConstraint[0].UPDATE_RULE !== 'CASCADE') {
       await connection.query(
-        'ALTER TABLE `controle-acesso` ADD CONSTRAINT fk_controle_acesso_morador_tagid FOREIGN KEY (tagid) REFERENCES moradores (TAGID)'
+        'ALTER TABLE `controle-acesso` ADD CONSTRAINT fk_controle_acesso_morador_tagid FOREIGN KEY (tagid) REFERENCES moradores (TAGID) ON UPDATE CASCADE'
       );
     }
     await connection.query(`
@@ -638,6 +646,84 @@ app.get('/gestao/cadastro-tag-morador', requirePortaria, (req, res) => {
   });
 });
 
+app.get('/gestao/troca-senha-morador', requirePortaria, (req, res) => {
+  return res.render('troca_senha_morador', {
+    error: null,
+    success: null,
+    email: '',
+    morador: null
+  });
+});
+
+app.post('/gestao/troca-senha-morador', requirePortaria, async (req, res) => {
+  const emailNormalizado = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const senha = typeof req.body.senha === 'string' ? req.body.senha : '';
+  const action = typeof req.body.action === 'string' ? req.body.action : 'localizar';
+
+  if (!emailNormalizado) {
+    return res.status(400).render('troca_senha_morador', {
+      error: 'Informe o e-mail do morador.',
+      success: null,
+      email: emailNormalizado,
+      morador: null
+    });
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, nome_completo, email FROM moradores WHERE email = ? LIMIT 1',
+      [emailNormalizado]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).render('troca_senha_morador', {
+        error: 'Morador não encontrado.',
+        success: null,
+        email: emailNormalizado,
+        morador: null
+      });
+    }
+
+    const morador = rows[0];
+
+    if (action === 'localizar') {
+      return res.render('troca_senha_morador', {
+        error: null,
+        success: null,
+        email: emailNormalizado,
+        morador
+      });
+    }
+
+    if (!senha) {
+      return res.status(400).render('troca_senha_morador', {
+        error: 'Informe a nova senha do morador.',
+        success: null,
+        email: emailNormalizado,
+        morador
+      });
+    }
+
+    const hash = await bcrypt.hash(senha, 10);
+    await pool.execute('UPDATE moradores SET senha = ? WHERE id = ?', [hash, morador.id]);
+
+    return res.render('troca_senha_morador', {
+      error: null,
+      success: 'Senha do morador alterada com sucesso!',
+      email: emailNormalizado,
+      morador
+    });
+  } catch (error) {
+    console.error('Erro ao trocar senha do morador:', error);
+    return res.status(500).render('troca_senha_morador', {
+      error: 'Não foi possível alterar a senha do morador.',
+      success: null,
+      email: emailNormalizado,
+      morador: null
+    });
+  }
+});
+
 app.post('/gestao/cadastro-tag-morador', requirePortaria, async (req, res) => {
   const emailNormalizado = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const tag = typeof req.body.tag === 'string' ? req.body.tag.trim() : '';
@@ -695,13 +781,54 @@ app.post('/gestao/cadastro-tag-morador', requirePortaria, async (req, res) => {
       });
     }
 
-    if (!tag) {
+    if (!tag && !morador.TAGID) {
       return res.status(400).render('cadastro_tag_morador', {
-        error: 'Informe a TAG.',
+        error: 'Informe uma TAG para realizar o cadastro.',
         success: null,
         email: emailNormalizado,
         tag,
         morador,
+        confirmation: false
+      });
+    }
+
+    if (!tag) {
+      const connection = await pool.getConnection();
+
+      try {
+        await connection.beginTransaction();
+        const [acessos] = await connection.execute(
+          'SELECT id FROM `controle-acesso` WHERE tagid = ? LIMIT 1 FOR UPDATE',
+          [morador.TAGID]
+        );
+
+        if (acessos.length > 0) {
+          await connection.rollback();
+          return res.status(409).render('cadastro_tag_morador', {
+            error: 'A ação não pode ser executada pois ja há registro de acessos',
+            success: null,
+            email: emailNormalizado,
+            tag: '',
+            morador,
+            confirmation: false
+          });
+        }
+
+        await connection.execute('UPDATE moradores SET TAGID = NULL WHERE id = ?', [morador.id]);
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+      return res.render('cadastro_tag_morador', {
+        error: null,
+        success: 'TAG removida com sucesso!',
+        email: emailNormalizado,
+        tag: '',
+        morador: { ...morador, TAGID: null },
         confirmation: false
       });
     }

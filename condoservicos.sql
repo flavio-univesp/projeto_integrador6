@@ -29,7 +29,7 @@ CREATE TABLE `controle-acesso` (
   `liberacao` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_controle_acesso_morador_tagid` (`tagid`),
-  CONSTRAINT `fk_controle_acesso_morador_tagid` FOREIGN KEY (`tagid`) REFERENCES `moradores` (`TAGID`)
+  CONSTRAINT `fk_controle_acesso_morador_tagid` FOREIGN KEY (`tagid`) REFERENCES `moradores` (`TAGID`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2058 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
