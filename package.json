@@ -12,6 +12,8 @@
     "node": "22.x"
   },
   "dependencies": {
+    "@azure/identity": "^4.11.1",
+    "@azure/storage-blob": "^12.29.1",
     "bcrypt": "^6.0.0",
     "dotenv": "^16.6.1",
     "ejs": "^3.1.10",

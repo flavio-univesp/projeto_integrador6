@@ -4,7 +4,9 @@ import ejs from 'ejs';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
+import { randomUUID, timingSafeEqual } from 'crypto';
+import { DefaultAzureCredential } from '@azure/identity';
+import { BlobClient, BlockBlobClient } from '@azure/storage-blob';
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 
@@ -14,25 +16,41 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET deve ser configurado em produção.');
+}
+
+const sessionSecret = process.env.SESSION_SECRET || randomUUID();
+const azureCredential = new DefaultAzureCredential();
+const maxAccessLogBytes = 1024 * 1024;
+const maxAccessLogEntries = 5000;
+const residentsBlobName = 'tags-autorizadas.json';
+let residentsSnapshotQueue = Promise.resolve();
 
 app.engine('ejs', ejs.renderFile);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.set('trust proxy', 1);
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'condoservicos-home-secret',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProduction,
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
     sameSite: 'strict'
   }
 }));
+
+const dbSslRequired = process.env.DB_SSL === 'true'
+  || process.env.DB_SSL_MODE?.toUpperCase() === 'REQUIRED';
 
 const dbConfig = {
   host: process.env.DB_HOST || 'db',
@@ -43,10 +61,197 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
+  ssl: dbSslRequired ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined
 };
 
 const pool = mysql.createPool(dbConfig);
+
+function webhookSecretsMatch(receivedSecret, configuredSecret) {
+  if (!receivedSecret || !configuredSecret) {
+    return false;
+  }
+
+  const received = Buffer.from(receivedSecret);
+  const configured = Buffer.from(configuredSecret);
+  return received.length === configured.length && timingSafeEqual(received, configured);
+}
+
+function createHttpError(message, statusCode) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+function publishResidentsSnapshot() {
+  const publish = async () => {
+    const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+    const containerName = process.env.RESIDENTS_BLOB_CONTAINER_NAME;
+
+    if (!storageAccountName || !containerName) {
+      if (isProduction) {
+        throw new Error('Configuração do container de residentes indisponível.');
+      }
+      return;
+    }
+
+    const [residents] = await pool.execute(
+      `SELECT TAGID AS tagid
+       FROM moradores
+       WHERE TAGID IS NOT NULL AND TRIM(TAGID) <> ''
+       ORDER BY TAGID`
+    );
+    const generatedAt = new Date().toISOString();
+    const snapshot = {
+      version: generatedAt,
+      generatedAt,
+      tags: residents.map(({ tagid }) => ({ tagid }))
+    };
+    const content = JSON.stringify(snapshot, null, 2);
+    const blobUrl = `https://${storageAccountName}.blob.core.windows.net/${containerName}/${residentsBlobName}`;
+    const blobClient = new BlockBlobClient(blobUrl, azureCredential);
+
+    await blobClient.uploadData(Buffer.from(content, 'utf8'), {
+      blobHTTPHeaders: {
+        blobContentType: 'application/json; charset=utf-8',
+        blobCacheControl: 'no-cache'
+      }
+    });
+    console.log(`Lista de TAGs publicada em ${containerName}/${residentsBlobName}.`);
+  };
+
+  const operation = residentsSnapshotQueue.then(publish);
+  residentsSnapshotQueue = operation.catch(() => {});
+  return operation;
+}
+
+async function downloadAccessLog(blobUrl) {
+  const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+  const containerName = process.env.ACCESS_LOGS_BLOB_CONTAINER_NAME;
+
+  if (!storageAccountName || !containerName) {
+    throw createHttpError('Configuração do Blob Storage indisponível.', 503);
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(blobUrl);
+  } catch {
+    throw createHttpError('URL do blob inválida.', 400);
+  }
+
+  const expectedHost = `${storageAccountName}.blob.core.windows.net`;
+  const pathParts = parsedUrl.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== expectedHost
+      || pathParts[0] !== containerName || pathParts[1] !== 'logs'
+      || !pathParts[2] || !parsedUrl.pathname.toLowerCase().endsWith('.ndjson')) {
+    throw createHttpError('Blob fora do caminho de ingestão permitido.', 400);
+  }
+
+  const response = await new BlobClient(parsedUrl.toString(), azureCredential).download();
+  if (response.contentLength > maxAccessLogBytes || !response.readableStreamBody) {
+    throw createHttpError('Arquivo de acesso ausente ou maior que o permitido.', 413);
+  }
+
+  const chunks = [];
+  let totalBytes = 0;
+  for await (const chunk of response.readableStreamBody) {
+    totalBytes += chunk.length;
+    if (totalBytes > maxAccessLogBytes) {
+      throw createHttpError('Arquivo de acesso maior que o permitido.', 413);
+    }
+    chunks.push(Buffer.from(chunk));
+  }
+
+  return {
+    content: Buffer.concat(chunks).toString('utf8'),
+    deviceId: pathParts[2]
+  };
+}
+
+function parseAccessLog(content, expectedDeviceId) {
+  const lines = content.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length === 0 || lines.length > maxAccessLogEntries) {
+    throw createHttpError('Quantidade de eventos inválida no arquivo.', 400);
+  }
+
+  return lines.map((line, index) => {
+    let item;
+    try {
+      item = JSON.parse(line);
+    } catch {
+      throw createHttpError(`JSON inválido na linha ${index + 1}.`, 400);
+    }
+
+    const eventoId = typeof item.eventoId === 'string' ? item.eventoId.trim() : '';
+    const dispositivoId = typeof item.dispositivoId === 'string' ? item.dispositivoId.trim() : '';
+    const tagid = typeof item.tagid === 'string' ? item.tagid.trim() : '';
+    const isoUtcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+    const accessDate = typeof item.acesso === 'string' && isoUtcPattern.test(item.acesso)
+      ? new Date(item.acesso)
+      : null;
+
+    if (!eventoId || eventoId.length > 80 || !dispositivoId || dispositivoId.length > 80
+        || dispositivoId !== expectedDeviceId || !tagid || tagid.length > 20
+        || !accessDate || Number.isNaN(accessDate.getTime()) || typeof item.liberacao !== 'boolean') {
+      throw createHttpError(`Evento inválido na linha ${index + 1}.`, 400);
+    }
+
+    return {
+      eventoId,
+      dispositivoId,
+      tagid,
+      acesso: accessDate.toISOString().slice(0, 19).replace('T', ' '),
+      liberacao: item.liberacao
+    };
+  });
+}
+
+async function importAccessLog(records) {
+  const connection = await pool.getConnection();
+  const result = { processed: 0, rejected: 0, duplicates: 0 };
+
+  try {
+    await connection.beginTransaction();
+    for (const record of records) {
+      const [residents] = await connection.execute(
+        'SELECT 1 FROM moradores WHERE TAGID = ? LIMIT 1',
+        [record.tagid]
+      );
+      const accepted = residents.length > 0;
+      const rejectionReason = accepted ? null : 'TAG não cadastrada.';
+      const [importResult] = await connection.execute(
+        `INSERT IGNORE INTO controle_acesso_importacao
+          (evento_id, dispositivo_id, tagid, acesso, liberacao, status, motivo_rejeicao)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [record.eventoId, record.dispositivoId, record.tagid, record.acesso,
+          record.liberacao, accepted ? 'PROCESSADO' : 'REJEITADO', rejectionReason]
+      );
+
+      if (importResult.affectedRows === 0) {
+        result.duplicates += 1;
+        continue;
+      }
+
+      if (!accepted) {
+        result.rejected += 1;
+        continue;
+      }
+
+      await connection.execute(
+        'INSERT INTO `controle-acesso` (tagid, acesso, liberacao) VALUES (?, ?, ?)',
+        [record.tagid, record.acesso, record.liberacao]
+      );
+      result.processed += 1;
+    }
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
 
 function requirePortaria(req, res, next) {
   if (!req.session.authorized || req.session.accessType !== 'portaria') {
@@ -73,8 +278,9 @@ function requireEditPortariaAccess(req, res, next) {
 }
 
 async function initDatabase() {
+  let connection;
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
     await connection.query(`
       CREATE TABLE IF NOT EXISTS moradores (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -106,6 +312,20 @@ async function initDatabase() {
         liberacao BOOLEAN NOT NULL,
         CONSTRAINT fk_controle_acesso_morador_tagid
           FOREIGN KEY (tagid) REFERENCES moradores (TAGID) ON UPDATE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS controle_acesso_importacao (
+        evento_id VARCHAR(80) NOT NULL,
+        dispositivo_id VARCHAR(80) NOT NULL,
+        tagid VARCHAR(20) NOT NULL,
+        acesso DATETIME NOT NULL,
+        liberacao BOOLEAN NOT NULL,
+        recebido_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        status ENUM('PROCESSADO', 'REJEITADO') NOT NULL,
+        motivo_rejeicao VARCHAR(255) NULL,
+        PRIMARY KEY (evento_id),
+        KEY idx_importacao_dispositivo_acesso (dispositivo_id, acesso)
       )
     `);
     const [controleAcessoConstraint] = await connection.execute(
@@ -182,12 +402,54 @@ async function initDatabase() {
         'ALTER TABLE portaria ADD CONSTRAINT fk_portaria_turno FOREIGN KEY (turno) REFERENCES `portaria-turnos` (id)'
       );
     }
-    connection.release();
     console.log('Banco inicializado com sucesso.');
   } catch (error) {
     console.error('Erro ao inicializar banco:', error.message);
+    throw error;
+  } finally {
+    connection?.release();
   }
 }
+
+app.post('/api/events/blob-created', async (req, res) => {
+  const receivedSecret = req.get('X-EventGrid-Webhook-Secret');
+  if (!webhookSecretsMatch(receivedSecret, process.env.EVENT_GRID_WEBHOOK_SECRET)) {
+    return res.sendStatus(401);
+  }
+
+  const events = Array.isArray(req.body) ? req.body : [req.body];
+  const validationEvent = events.find(
+    (event) => event?.eventType === 'Microsoft.EventGrid.SubscriptionValidationEvent'
+  );
+  if (validationEvent?.data?.validationCode) {
+    return res.json({ validationResponse: validationEvent.data.validationCode });
+  }
+
+  const blobEvents = events.filter(
+    (event) => event?.eventType === 'Microsoft.Storage.BlobCreated' && event?.data?.url
+  );
+  if (blobEvents.length === 0) {
+    return res.status(400).json({ error: 'Nenhum evento BlobCreated válido foi recebido.' });
+  }
+
+  try {
+    const summary = { processed: 0, rejected: 0, duplicates: 0 };
+    for (const event of blobEvents) {
+      const { content, deviceId } = await downloadAccessLog(event.data.url);
+      const result = await importAccessLog(parseAccessLog(content, deviceId));
+      summary.processed += result.processed;
+      summary.rejected += result.rejected;
+      summary.duplicates += result.duplicates;
+    }
+    return res.json(summary);
+  } catch (error) {
+    console.error('Erro ao importar arquivo de acessos:', error.message);
+    const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500;
+    return res.status(statusCode).json({
+      error: statusCode >= 500 ? 'Não foi possível importar o arquivo de acessos.' : error.message
+    });
+  }
+});
 
 app.get('/', (req, res) => {
   res.redirect('/home');
@@ -823,6 +1085,8 @@ app.post('/gestao/cadastro-tag-morador', requirePortaria, async (req, res) => {
         connection.release();
       }
 
+      await publishResidentsSnapshot();
+
       return res.render('cadastro_tag_morador', {
         error: null,
         success: 'TAG removida com sucesso!',
@@ -872,6 +1136,7 @@ app.post('/gestao/cadastro-tag-morador', requirePortaria, async (req, res) => {
     }
 
     await pool.execute('UPDATE moradores SET TAGID = ? WHERE id = ?', [tag, morador.id]);
+    await publishResidentsSnapshot();
 
     return res.render('cadastro_tag_morador', {
       error: null,
@@ -1091,7 +1356,26 @@ app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/home'));
 });
 
-initDatabase();
+app.get('/health/live', (req, res) => {
+  res.json({ status: 'live' });
+});
+
+app.get('/health/ready', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    return res.json({ status: 'ready' });
+  } catch {
+    return res.status(503).json({ status: 'not ready' });
+  }
+});
+
+try {
+  await initDatabase();
+  await publishResidentsSnapshot();
+} catch {
+  await pool.end();
+  process.exit(1);
+}
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor em http://localhost:${port}`);

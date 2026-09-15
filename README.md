@@ -78,6 +78,22 @@ O arquivo `compose.yaml` define dois serviços:
 
 O serviço `app` só inicia depois que o healthcheck do MySQL informa que o banco está saudável.
 
+## Lista de TAGs para o dispositivo
+
+A aplicação publica o blob `tags-autorizadas.json` no container `residentes` ao iniciar e depois de cada cadastro, alteração ou remoção de TAG feita pela tela de cadastro de TAG do morador. O arquivo contém somente TAGs associadas a moradores:
+
+```json
+{
+    "version": "2026-09-15T18:30:00.000Z",
+    "generatedAt": "2026-09-15T18:30:00.000Z",
+    "tags": [
+        { "tagid": "23 7E 5B 63" }
+    ]
+}
+```
+
+Quando não existem TAGs cadastradas, `tags` é um array vazio. No Azure, o upload usa a Managed Identity atribuída ao Container App; nenhuma chave do Storage é armazenada na aplicação.
+
 ## Modelo de dados
 
 ```mermaid
