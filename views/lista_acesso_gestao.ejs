@@ -41,6 +41,7 @@
             <option value="">Todas</option>
             <option value="liberado" <%= filtros.situacao === 'liberado' ? 'selected' : '' %>>Liberado</option>
             <option value="bloqueado" <%= filtros.situacao === 'bloqueado' ? 'selected' : '' %>>Bloqueado</option>
+            <option value="negado" <%= filtros.situacao === 'negado' ? 'selected' : '' %>>Negado (TAG não cadastrada)</option>
           </select>
           <button type="submit" name="filtrar" value="situacao">Filtrar por situação</button>
         </div>
@@ -66,20 +67,28 @@
                 <th scope="col">E-mail</th>
                 <th scope="col">TAGID</th>
                 <th scope="col">Situação</th>
+                <th scope="col">Motivo</th>
               </tr>
             </thead>
             <tbody>
-              <% acessos.forEach((acesso) => { %>
+              <% acessos.forEach((acesso) => {
+                   const statusClass = acesso.situacao === 'liberado' ? 'allowed'
+                                     : acesso.situacao === 'bloqueado' ? 'blocked'
+                                     : 'denied';
+                   const statusLabel = acesso.situacao === 'liberado' ? 'Liberado'
+                                     : acesso.situacao === 'bloqueado' ? 'Bloqueado'
+                                     : 'Negado'; %>
                 <tr>
                   <td><%= acesso.acesso %></td>
                   <td><%= acesso.nome_completo %></td>
                   <td><%= acesso.email %></td>
                   <td><%= acesso.tagid %></td>
                   <td>
-                    <span class="access-status <%= acesso.liberacao ? 'allowed' : 'blocked' %>">
-                      <%= acesso.liberacao ? 'Liberado' : 'Bloqueado' %>
+                    <span class="access-status <%= statusClass %>" style="<%= statusClass === 'denied' ? 'background:#fde68a;color:#78350f;' : '' %>">
+                      <%= statusLabel %>
                     </span>
                   </td>
+                  <td><%= acesso.motivo || '' %></td>
                 </tr>
               <% }) %>
             </tbody>
