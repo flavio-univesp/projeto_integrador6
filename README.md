@@ -1,8 +1,39 @@
-# Controle de Acessos para Condomínios
 
-Aplicação web para cadastro de moradores, gestão de usuários da portaria, associação de TAGs RFID e consulta do histórico de acessos à portaria central.
+<p align="center"> <i>Desenvolvido com dedicação pelo grupo <strong>CondoAcessos</strong> — Projeto Integrador em Computação VI (UNIVESP, 2026)</i> </p> </div>
 
-O projeto utiliza Node.js, Express, EJS e MySQL 8. A aplicação e o banco de dados são executados em containers Docker coordenados pelo Docker Compose.
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/50468352/141820811-412e9364-7f5c-4889-826a-fcba23b92e23.png" width="350" alt="Logo do Projeto" />
+</p>
+
+<h3 align="center">📌 Projeto Integrador em Computação VI - 2026</h3>
+
+<p align="center"><strong>Polos:</strong> Araras-SP, Campinas-SP, Elias Fausto-SP, Estiva Gerbi-SP, Indaiatuba-SP, Leme-SP, Várzea Paulista-SP</p>
+<p align="center"><strong>Orientadora do PI:</strong> Aline Santana</p>
+
+---
+
+## 👥 Integrantes do grupo
+
+| Nome                                | RA       |
+|-------------------------------------|----------|
+| Daniel Anunciato                    | 2222677  |
+| Eder Clauber dos Santos dos Anjos   | 1806662  |
+| Felipe Rafael Henriques             | 2214261  |
+| Flavio Jorge de Medeiros            | 23205233 |
+| Francisco Ribeiro da Silva Junior   | 2108392  |
+| Kelven Joseph Machado Santos        | 2100626  |
+| Matheus Eduardo Peixoto de Carvalho | 2205301  |
+| Nicolly de Sousa Lima               | 2205907  |
+
+---
+
+## 💡 Projeto: *CondoAcesso — Controle de Acessos para Condomínios*
+
+> **Aplicação web para cadastro de moradores, gestão de usuários da portaria, associação de TAGs RFID, integração com dispositivos IoT e consulta do histórico de acessos à portaria central.**
+
+O projeto utiliza Node.js, Express, EJS e MySQL 8. Localmente, a aplicação e o banco de dados são executados em containers Docker coordenados pelo Docker Compose. No Azure, a aplicação publica as TAGs autorizadas no Blob Storage e importa os registros enviados pelos dispositivos por meio do IoT Hub e do Event Grid.
+
+---
 
 ## Funcionalidades
 
@@ -11,7 +42,7 @@ O projeto utiliza Node.js, Express, EJS e MySQL 8. A aplicação e o banco de da
 - Cadastro e autenticação independentes.
 - Menu exclusivo após o login.
 - Consulta e atualização dos próprios dados.
-- Nome e TAGID protegidos contra alteração pelo morador.
+- Nome e TAGID protegidos contra alterações pelo morador.
 - Consulta exclusiva do próprio histórico de acessos.
 - Filtros combináveis por data e situação.
 - Situações apresentadas como `Liberado` ou `Bloqueado`.
@@ -24,6 +55,17 @@ O projeto utiliza Node.js, Express, EJS e MySQL 8. A aplicação e o banco de da
 - Associação e substituição confirmada de TAGID.
 - Consulta de todos os acessos à portaria central.
 - Filtros combináveis por data, e-mail do morador e situação.
+- Identificação separada de acessos liberados, bloqueados e negados por TAG não cadastrada.
+
+### Integração IoT
+
+- Publicação da lista de TAGs autorizadas no blob `residentes/tags-autorizadas.json`.
+- Recebimento de eventos `BlobCreated` do Event Grid em um endpoint autenticado por segredo.
+- Importação transacional de arquivos NDJSON enviados pelos dispositivos ao container `logs-acesso`.
+- Validação do dispositivo, TAGID, data UTC, decisão de liberação e tamanho do arquivo.
+- Idempotência pelo campo `eventoId`, com contabilização de eventos duplicados e rejeitados.
+- Recuperação de arquivos NDJSON pendentes durante a inicialização da aplicação.
+- Exclusão do blob de acesso após a importação bem-sucedida.
 
 ## Tecnologias
 
@@ -34,6 +76,8 @@ O projeto utiliza Node.js, Express, EJS e MySQL 8. A aplicação e o banco de da
 | Banco de dados | MySQL 8 |
 | Acesso ao banco | mysql2/promise |
 | Autenticação | express-session e bcrypt |
+| Integração Azure | `@azure/identity` e `@azure/storage-blob` |
+| Ingestão IoT | Azure IoT Hub e Event Grid |
 | Frontend | HTML, CSS e JavaScript |
 | Containers | Docker e Docker Compose |
 
@@ -94,6 +138,18 @@ A aplicação publica o blob `tags-autorizadas.json` no container `residentes` a
 
 Quando não existem TAGs cadastradas, `tags` é um array vazio. No Azure, o upload usa a Managed Identity atribuída ao Container App; nenhuma chave do Storage é armazenada na aplicação.
 
+## Ingestão dos registros de acesso
+
+O dispositivo envia arquivos `.ndjson` ao container configurado em `ACCESS_LOGS_BLOB_CONTAINER_NAME`. Cada linha representa um evento independente:
+
+```json
+{"eventoId":"portaria-01-000001","dispositivoId":"portaria-01","tagid":"23 7E 5B 63","acesso":"2026-09-17T21:15:00Z","liberacao":true}
+```
+
+O Event Grid notifica o endpoint `POST /api/events/blob-created` quando um blob NDJSON é criado. A aplicação aceita somente URLs HTTPS da conta e do contêiner configurados, confere se o identificador do dispositivo corresponde ao caminho do blob e limita cada arquivo a 1 MiB e 5.000 eventos.
+
+Eventos de TAGs cadastradas são gravados em `controle-acesso` e marcados como `PROCESSADO` no histórico de importação. Eventos de TAGs desconhecidas são mantidos em `controle_acesso_importacao` como `REJEITADO`, com o motivo `TAG não cadastrada.`, e aparecem como `Negado` na tela da portaria. O blob é removido somente depois da conclusão da transação.
+
 ## Modelo de dados
 
 ```mermaid
@@ -126,6 +182,17 @@ erDiagram
         BOOLEAN liberacao
     }
 
+    CONTROLE_ACESSO_IMPORTACAO {
+        VARCHAR evento_id PK
+        VARCHAR dispositivo_id
+        VARCHAR tagid
+        DATETIME acesso
+        BOOLEAN liberacao
+        TIMESTAMP recebido_em
+        ENUM status
+        VARCHAR motivo_rejeicao
+    }
+
     PORTARIA_TURNOS {
         INT id PK
         VARCHAR nome UK
@@ -144,6 +211,7 @@ erDiagram
 ### Relacionamentos
 
 - `controle-acesso.tagid` referencia `moradores.TAGID`: um morador pode possuir vários registros de acesso.
+- `controle_acesso_importacao.evento_id` garante a idempotência da ingestão e registra eventos processados ou rejeitados.
 - `portaria.turno` referencia `portaria-turnos.id`: um turno pode estar associado a vários usuários da portaria.
 - `moradores.email`, `moradores.TAGID`, `portaria.email` e `portaria-turnos.nome` são únicos.
 - O MySQL armazena `BOOLEAN` como `TINYINT(1)`: `1` representa liberado e `0` representa bloqueado.
@@ -158,6 +226,9 @@ O `server.js` cria as tabelas, índices, relacionamentos e turnos iniciais de ma
 |---|---|---|
 | GET | `/` | Redireciona para `/home` |
 | GET | `/home` | Página inicial |
+| POST | `/api/events/blob-created` | Handshake e eventos do Event Grid; exige o cabeçalho secreto |
+| GET | `/health/live` | Verificação de disponibilidade do processo |
+| GET | `/health/ready` | Verificação de disponibilidade do banco de dados |
 | GET/POST | `/login` | Autenticação da portaria |
 | GET/POST | `/login-morador` | Autenticação do morador |
 | GET/POST | `/cadastro-portaria` | Cadastro de usuário da portaria |
@@ -199,11 +270,18 @@ Copy-Item .env.example .env
 | `DB_NAME` | Nome do banco | `condoservicos` |
 | `DB_USER` | Usuário da aplicação | `condoservicos` |
 | `DB_PASSWORD` | Senha do usuário da aplicação | Definida localmente |
-| `DB_ROOT_PASSWORD` | Senha root usada pelo container MySQL | Definida localmente |
+| `DB_ROOT_PASSWORD` | Senha do usuário root usada pelo contêiner MySQL | Definida localmente |
 | `SESSION_SECRET` | Segredo de assinatura das sessões | Valor longo e aleatório |
 | `DB_SSL` | Ativa SSL no cliente MySQL quando `true` | `false` |
+| `AZURE_CLIENT_ID` | Client ID da Managed Identity atribuída à aplicação | Fornecido pelo Terraform |
+| `AZURE_STORAGE_ACCOUNT_NAME` | Nome da conta de armazenamento usada pelas integrações | `stcondoacesso...` |
+| `RESIDENTS_BLOB_CONTAINER_NAME` | Container da lista de TAGs autorizadas | `residentes` |
+| `ACCESS_LOGS_BLOB_CONTAINER_NAME` | Container dos arquivos NDJSON de acesso | `logs-acesso` |
+| `EVENT_GRID_WEBHOOK_SECRET` | Segredo comparado ao header `X-EventGrid-Webhook-Secret` | Valor longo e aleatório |
 
 As variáveis `EMAIL_ENABLED`, `EMAIL_USER`, `EMAIL_PASSWORD` e `EMAIL_TO` estão reservadas no exemplo de ambiente, mas o envio de e-mails não faz parte dos fluxos atuais.
+
+Em desenvolvimento, as integrações com o Blob Storage são ignoradas quando as variáveis do Azure não estão preenchidas. Em produção, a ausência dos contêineres configurados impede a inicialização. A autenticação no Azure usa `DefaultAzureCredential`; no Container App, informe `AZURE_CLIENT_ID` para selecionar a Managed Identity atribuída pelo usuário.
 
 Nunca publique o arquivo `.env`. Em produção, substitua todas as credenciais de exemplo e use um `SESSION_SECRET` forte.
 
@@ -238,7 +316,7 @@ docker compose stop
 docker compose start
 ```
 
-Também é possível recriar os containers preservando o volume do banco:
+Também é possível recriar os contêineres preservando o volume do banco:
 
 ```powershell
 docker compose down
@@ -295,9 +373,9 @@ docker compose up -d app
 
 Para restaurar sobre um banco que já contém dados, faça primeiro um backup atualizado. O dump inclui comandos de remoção e recriação das tabelas.
 
-## Transporte para máquina sem possibilidade de build
+## Transporte para uma máquina sem possibilidade de build
 
-Use este fluxo quando a máquina de destino pode executar Docker, mas não pode baixar dependências nem construir a aplicação por restrições de segurança.
+Use este fluxo quando a máquina de destino puder executar o Docker, mas não puder baixar dependências nem construir a aplicação devido a restrições de segurança.
 
 ### Na máquina de origem
 
@@ -316,7 +394,7 @@ docker pull mysql:8.0
 docker save -o condoservicos-imagens.tar condoservicos-app:1.0 mysql:8.0
 ```
 
-Gere um backup atualizado usando o procedimento da seção anterior. Transfira para a máquina de destino:
+Gere um backup atualizado usando o procedimento da seção anterior. Transfira os seguintes itens para a máquina de destino:
 
 - O projeto completo.
 - `condoservicos-imagens.tar`.
@@ -358,7 +436,7 @@ docker compose ps
 
 ## Execução sem Docker
 
-Esta opção exige Node.js 22 e MySQL 8 instalados localmente:
+Esta opção exige que o Node.js 22 e o MySQL 8 estejam instalados localmente:
 
 ```powershell
 npm install
@@ -373,11 +451,14 @@ No `.env`, altere `DB_HOST` para o endereço do MySQL, por exemplo `127.0.0.1`. 
 - Senhas são armazenadas como hashes bcrypt.
 - A sessão é regenerada depois da autenticação.
 - Cookies de sessão usam `httpOnly` e `sameSite=strict`.
-- Rotas de morador e portaria possuem guards separados.
+- As rotas de morador e de portaria possuem mecanismos de proteção separados.
 - Consultas e atualizações usam parâmetros SQL.
 - O histórico do morador é limitado pelo ID armazenado na sessão, não por parâmetros recebidos do navegador.
 - A chave estrangeira de TAG impede registros de acesso para uma TAG inexistente.
-- A sessão padrão usa armazenamento em memória. Para produção com múltiplas instâncias, use um session store persistente, como Redis ou MySQL.
+- O endpoint do Event Grid usa comparação de segredo resistente a ataques de temporização e aceita somente blobs do host, container, extensão e caminho esperados.
+- Arquivos de acesso são limitados a 1 MiB e 5.000 eventos; cada evento deve conter data UTC ISO 8601 e TAGID normalizada com quatro bytes.
+- Eventos com TAG desconhecida ficam no histórico de importação para auditoria, sem violar a chave estrangeira da tabela final de acessos.
+- A sessão padrão usa armazenamento em memória. Para produção com múltiplas instâncias, use um armazenamento de sessões persistente, como Redis ou MySQL.
 - Com `NODE_ENV=production`, o cookie é marcado como seguro e requer HTTPS.
 - O dump `condoservicos.sql` contém dados pessoais e hashes de senha. Trate-o como arquivo confidencial e não o publique em repositórios públicos.
 
@@ -402,10 +483,27 @@ docker compose exec db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_
 
 ## Atenção ao volume do banco
 
-O comando abaixo remove containers **e apaga definitivamente o volume do MySQL**:
+O comando abaixo remove contêineres **e apaga definitivamente o volume do MySQL**:
 
 ```powershell
 docker compose down -v
 ```
 
 Use-o somente quando desejar reinicializar completamente o banco e possuir um backup válido.
+
+## Bibliografia sugerida
+
+As referências a seguir auxiliam no entendimento das tecnologias, dos serviços e das práticas de segurança empregados na solução:
+
+- NODE.JS. [Node.js v22 documentation](https://nodejs.org/docs/latest-v22.x/api/). Referência para o ambiente de execução JavaScript e suas APIs.
+- OPENJS FOUNDATION. [Express 5.x API reference](https://expressjs.com/en/5x/api.html). Documentação do framework utilizado na definição das rotas e dos middlewares da aplicação.
+- EJS. [EJS documentation](https://ejs.co/). Referência para a criação das páginas HTML renderizadas no servidor.
+- ORACLE. [MySQL 8.0 Reference Manual](https://dev.mysql.com/doc/refman/8.0/en/). Documentação sobre modelagem relacional, consultas SQL, índices, transações e restrições de integridade.
+- DOCKER. [Docker Compose documentation](https://docs.docker.com/compose/). Referência para a definição e a execução dos serviços da aplicação e do banco de dados em contêineres.
+- MICROSOFT. [Azure Blob Storage documentation](https://learn.microsoft.com/azure/storage/blobs/). Documentação sobre armazenamento de objetos, contêineres e operações com blobs.
+- MICROSOFT. [Azure IoT Hub documentation](https://learn.microsoft.com/azure/iot-hub/). Referência para comunicação, gerenciamento e ingestão de dados de dispositivos IoT.
+- MICROSOFT. [Azure Event Grid documentation](https://learn.microsoft.com/azure/event-grid/). Documentação sobre a distribuição de eventos utilizada para notificar a aplicação da criação de blobs.
+- MICROSOFT. [Managed identities for Azure resources](https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/overview). Referência para autenticação entre serviços do Azure sem armazenamento de credenciais no código.
+- OWASP FOUNDATION. [Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html). Recomendações para o gerenciamento seguro de sessões e cookies em aplicações web.
+
+**Observação:** Todos links acima encontram-se funcionais e acessíveis em 18/09/2026.
