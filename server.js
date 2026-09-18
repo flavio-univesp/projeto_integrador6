@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID, timingSafeEqual } from 'crypto';
 import { DefaultAzureCredential } from '@azure/identity';
-import { BlobClient, BlockBlobClient } from '@azure/storage-blob';
+import { BlobClient, BlockBlobClient, ContainerClient } from '@azure/storage-blob';
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 
@@ -82,6 +82,16 @@ function createHttpError(message, statusCode) {
   return error;
 }
 
+function normalizeTagId(value) {
+  const compactTag = value.trim().replace(/[:\s]/g, '').toUpperCase();
+
+  if (!/^[0-9A-F]{8}$/.test(compactTag)) {
+    return null;
+  }
+
+  return compactTag.match(/.{2}/g).join(' ');
+}
+
 function publishResidentsSnapshot() {
   const publish = async () => {
     const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
@@ -141,13 +151,19 @@ async function downloadAccessLog(blobUrl) {
 
   const expectedHost = `${storageAccountName}.blob.core.windows.net`;
   const pathParts = parsedUrl.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  const legacyDeviceId = pathParts[1] === 'logs' ? pathParts[2] : '';
+  const iotHubDeviceId = pathParts[2] === 'logs' && pathParts[1] === pathParts[3]
+    ? pathParts[3]
+    : '';
+  const deviceId = iotHubDeviceId || legacyDeviceId;
   if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== expectedHost
-      || pathParts[0] !== containerName || pathParts[1] !== 'logs'
-      || !pathParts[2] || !parsedUrl.pathname.toLowerCase().endsWith('.ndjson')) {
+      || pathParts[0] !== containerName || !deviceId
+      || !parsedUrl.pathname.toLowerCase().endsWith('.ndjson')) {
     throw createHttpError('Blob fora do caminho de ingestão permitido.', 400);
   }
 
-  const response = await new BlobClient(parsedUrl.toString(), azureCredential).download();
+  const blobClient = new BlobClient(parsedUrl.toString(), azureCredential);
+  const response = await blobClient.download();
   if (response.contentLength > maxAccessLogBytes || !response.readableStreamBody) {
     throw createHttpError('Arquivo de acesso ausente ou maior que o permitido.', 413);
   }
@@ -164,7 +180,8 @@ async function downloadAccessLog(blobUrl) {
 
   return {
     content: Buffer.concat(chunks).toString('utf8'),
-    deviceId: pathParts[2]
+    deviceId,
+    blobClient
   };
 }
 
@@ -184,7 +201,7 @@ function parseAccessLog(content, expectedDeviceId) {
 
     const eventoId = typeof item.eventoId === 'string' ? item.eventoId.trim() : '';
     const dispositivoId = typeof item.dispositivoId === 'string' ? item.dispositivoId.trim() : '';
-    const tagid = typeof item.tagid === 'string' ? item.tagid.trim() : '';
+    const tagid = typeof item.tagid === 'string' ? normalizeTagId(item.tagid) : null;
     const isoUtcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
     const accessDate = typeof item.acesso === 'string' && isoUtcPattern.test(item.acesso)
       ? new Date(item.acesso)
@@ -250,6 +267,40 @@ async function importAccessLog(records) {
     throw error;
   } finally {
     connection.release();
+  }
+}
+
+async function processAccessLogBlob(blobUrl) {
+  const { content, deviceId, blobClient } = await downloadAccessLog(blobUrl);
+  const result = await importAccessLog(parseAccessLog(content, deviceId));
+  await blobClient.deleteIfExists({ deleteSnapshots: 'include' });
+  return result;
+}
+
+async function importPendingAccessLogs() {
+  const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+  const containerName = process.env.ACCESS_LOGS_BLOB_CONTAINER_NAME;
+
+  if (!storageAccountName || !containerName) {
+    if (isProduction) {
+      throw new Error('Configuração do container de logs de acesso indisponível.');
+    }
+    return;
+  }
+
+  const containerUrl = `https://${storageAccountName}.blob.core.windows.net/${containerName}`;
+  const containerClient = new ContainerClient(containerUrl, azureCredential);
+
+  for await (const blob of containerClient.listBlobsFlat()) {
+    if (!blob.name.toLowerCase().endsWith('.ndjson')) {
+      continue;
+    }
+
+    try {
+      await processAccessLogBlob(containerClient.getBlobClient(blob.name).url);
+    } catch (error) {
+      console.error(`Erro ao importar blob pendente ${blob.name}:`, error.message);
+    }
   }
 }
 
@@ -435,8 +486,7 @@ app.post('/api/events/blob-created', async (req, res) => {
   try {
     const summary = { processed: 0, rejected: 0, duplicates: 0 };
     for (const event of blobEvents) {
-      const { content, deviceId } = await downloadAccessLog(event.data.url);
-      const result = await importAccessLog(parseAccessLog(content, deviceId));
+      const result = await processAccessLogBlob(event.data.url);
       summary.processed += result.processed;
       summary.rejected += result.rejected;
       summary.duplicates += result.duplicates;
@@ -751,37 +801,71 @@ app.get('/lista-acesso-gestao', requirePortaria, async (req, res) => {
   const data = typeof req.query.data === 'string' ? req.query.data.trim() : '';
   const email = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
   const situacaoInformada = typeof req.query.situacao === 'string' ? req.query.situacao.trim().toLowerCase() : '';
-  const situacao = ['liberado', 'bloqueado'].includes(situacaoInformada) ? situacaoInformada : '';
-  const conditions = [];
-  const values = [];
+  const situacao = ['liberado', 'bloqueado', 'negado'].includes(situacaoInformada) ? situacaoInformada : '';
+
+  const controleConditions = [];
+  const importacaoConditions = ["ci.status = 'REJEITADO'"];
+  const filterParams = [];
 
   if (data && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
-    conditions.push('DATE(ca.acesso) = ?');
-    values.push(data);
+    controleConditions.push('DATE(ca.acesso) = ?');
+    importacaoConditions.push('DATE(ci.acesso) = ?');
+    filterParams.push(data);
   }
-
   if (email) {
-    conditions.push('LOWER(m.email) LIKE ?');
-    values.push(`%${email}%`);
+    controleConditions.push('LOWER(m.email) LIKE ?');
+    importacaoConditions.push('LOWER(m.email) LIKE ?');
+    filterParams.push(`%${email}%`);
   }
+  if (situacao === 'liberado') controleConditions.push('ca.liberacao = 1');
+  if (situacao === 'bloqueado') controleConditions.push('ca.liberacao = 0');
 
-  if (situacao) {
-    conditions.push('ca.liberacao = ?');
-    values.push(situacao === 'liberado' ? 1 : 0);
+  const controleWhere = controleConditions.length > 0 ? `WHERE ${controleConditions.join(' AND ')}` : '';
+  const importacaoWhere = `WHERE ${importacaoConditions.join(' AND ')}`;
+
+  const controleSelect = `SELECT
+        CAST(ca.id AS CHAR) AS id,
+        'controle' AS origem,
+        ca.tagid,
+        DATE_FORMAT(ca.acesso, '%d/%m/%Y %H:%i:%s') AS acesso,
+        ca.acesso AS acesso_raw,
+        IF(ca.liberacao = 1, 'liberado', 'bloqueado') AS situacao,
+        m.nome_completo,
+        m.email,
+        NULL AS motivo
+      FROM \`controle-acesso\` ca
+      INNER JOIN moradores m ON m.TAGID = ca.tagid
+      ${controleWhere}`;
+
+  const importacaoSelect = `SELECT
+        ci.evento_id AS id,
+        'importacao' AS origem,
+        ci.tagid,
+        DATE_FORMAT(ci.acesso, '%d/%m/%Y %H:%i:%s') AS acesso,
+        ci.acesso AS acesso_raw,
+        'negado' AS situacao,
+        COALESCE(m.nome_completo, '(não cadastrado)') AS nome_completo,
+        COALESCE(m.email, '—') AS email,
+        ci.motivo_rejeicao AS motivo
+      FROM controle_acesso_importacao ci
+      LEFT JOIN moradores m ON m.TAGID = ci.tagid
+      ${importacaoWhere}`;
+
+  let query;
+  let values;
+  if (situacao === 'liberado' || situacao === 'bloqueado') {
+    query = `${controleSelect} ORDER BY acesso_raw DESC, id DESC`;
+    values = filterParams;
+  } else if (situacao === 'negado') {
+    query = `${importacaoSelect} ORDER BY acesso_raw DESC, id DESC`;
+    values = filterParams;
+  } else {
+    query = `(${controleSelect}) UNION ALL (${importacaoSelect}) ORDER BY acesso_raw DESC, id DESC`;
+    values = [...filterParams, ...filterParams];
   }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   try {
-    const [acessos] = await pool.execute(
-            `SELECT ca.id, ca.tagid, DATE_FORMAT(ca.acesso, '%d/%m/%Y %H:%i:%s') AS acesso,
-              ca.liberacao, m.nome_completo, m.email
-       FROM \`controle-acesso\` ca
-       INNER JOIN moradores m ON m.TAGID = ca.tagid
-       ${where}
-       ORDER BY ca.acesso DESC, ca.id DESC`,
-      values
-    );
+    const [acessos] = await pool.execute(query, values);
 
     return res.render('lista_acesso_gestao', {
       user: req.session.user,
@@ -988,7 +1072,8 @@ app.post('/gestao/troca-senha-morador', requirePortaria, async (req, res) => {
 
 app.post('/gestao/cadastro-tag-morador', requirePortaria, async (req, res) => {
   const emailNormalizado = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  const tag = typeof req.body.tag === 'string' ? req.body.tag.trim() : '';
+  const tagInformada = typeof req.body.tag === 'string' ? req.body.tag.trim() : '';
+  const tag = tagInformada ? normalizeTagId(tagInformada) : '';
   const action = typeof req.body.action === 'string' ? req.body.action : 'localizar';
 
   if (!emailNormalizado) {
@@ -1038,6 +1123,17 @@ app.post('/gestao/cadastro-tag-morador', requirePortaria, async (req, res) => {
         success: 'Nada foi alterado.',
         email: emailNormalizado,
         tag: '',
+        morador,
+        confirmation: false
+      });
+    }
+
+    if (tagInformada && !tag) {
+      return res.status(400).render('cadastro_tag_morador', {
+        error: 'Informe uma TAG válida no formato A1 B2 C3 D4.',
+        success: null,
+        email: emailNormalizado,
+        tag: tagInformada,
         morador,
         confirmation: false
       });
@@ -1371,6 +1467,7 @@ app.get('/health/ready', async (req, res) => {
 
 try {
   await initDatabase();
+  await importPendingAccessLogs();
   await publishResidentsSnapshot();
 } catch {
   await pool.end();
