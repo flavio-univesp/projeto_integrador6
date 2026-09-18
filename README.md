@@ -544,3 +544,7 @@ As referências a seguir auxiliam no entendimento das tecnologias, dos serviços
 <p>
   <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Badge"/>
 </p>
+
+---
+
+<p align="center"><i>Desenvolvido com dedicação pelo grupo <strong>CondoAcessos</strong> — Projeto Integrador em Computação VI (UNIVESP, 2026)</i></p>
