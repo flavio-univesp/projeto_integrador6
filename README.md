@@ -507,3 +507,40 @@ As referências a seguir auxiliam no entendimento das tecnologias, dos serviços
 - OWASP FOUNDATION. [Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html). Recomendações para o gerenciamento seguro de sessões e cookies em aplicações web.
 
 **Observação:** Todos links acima encontram-se funcionais e acessíveis em 18/09/2026.
+
+## 🧰 Tecnologias e ferramentas utilizadas
+
+### Aplicação e interface
+
+<p>
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript Badge"/>
+  <img src="https://img.shields.io/badge/Node.js_22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js 22 Badge"/>
+  <img src="https://img.shields.io/badge/Express_5-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express 5 Badge"/>
+  <img src="https://img.shields.io/badge/EJS_3-B4CA65?style=for-the-badge&logo=ejs&logoColor=black" alt="EJS 3 Badge"/>
+  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white" alt="HTML5 Badge"/>
+  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3 Badge"/>
+</p>
+
+### Banco de dados e contêineres
+
+<p>
+  <img src="https://img.shields.io/badge/MySQL_8-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL 8 Badge"/>
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Badge"/>
+  <img src="https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Compose Badge"/>
+</p>
+
+### Nuvem e integração IoT
+
+<p>
+  <img src="https://img.shields.io/badge/Microsoft_Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="Microsoft Azure Badge"/>
+  <img src="https://img.shields.io/badge/Azure_Blob_Storage-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="Azure Blob Storage Badge"/>
+  <img src="https://img.shields.io/badge/Azure_IoT_Hub-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="Azure IoT Hub Badge"/>
+  <img src="https://img.shields.io/badge/Azure_Event_Grid-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="Azure Event Grid Badge"/>
+  <img src="https://img.shields.io/badge/Managed_Identity-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="Azure Managed Identity Badge"/>
+</p>
+
+### Controle de versão
+
+<p>
+  <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Badge"/>
+</p>
